@@ -1,0 +1,340 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Howzit | Login</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f0fdf4;
+        }
+        .modal-overlay {
+            background-color: rgba(0, 0, 0, 0.5);
+        }
+        .modal-content {
+            animation: slideUp 0.3s ease-out;
+        }
+        @keyframes slideUp {
+            from {
+                transform: translateY(20px);
+                opacity: 0;
+            }
+            to {
+                transform: translateY(0);
+                opacity: 1;
+            }
+        }
+        /* Custom styles for the reCAPTCHA badge */
+        .grecaptcha-badge {
+            bottom: 60px !important;
+            right: 20px !important;
+            z-index: 1000 !important;
+        }
+    </style>
+    <!-- Firebase SDKs -->
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.22.1/firebase-auth-compat.js"></script>
+    <script src="https://www.google.com/recaptcha/api.js?render=explicit"></script>
+</head>
+<body class="antialiased flex items-center justify-center min-h-screen">
+
+    <!-- Login Container -->
+    <div class="w-full max-w-sm mx-4 sm:mx-auto p-6 bg-white rounded-3xl shadow-2xl relative">
+        
+        <!-- Header with Back Arrow and Settings -->
+        <div class="flex justify-between items-center mb-8">
+            <a href="#" class="text-gray-500 hover:text-teal-500 transition-colors duration-200">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+            </a>
+            <span class="text-sm text-gray-400 uppercase tracking-widest">Settings</span>
+        </div>
+
+        <!-- Main Login Content -->
+        <div id="phone-entry-section">
+            <div class="text-center">
+                <h1 class="text-2xl font-semibold text-gray-800 mb-2">Your Phone Number</h1>
+                <p class="text-sm text-gray-500 mb-6">Please confirm your country code and enter your phone number.</p>
+            </div>
+            <form id="loginForm">
+                <!-- Custom Country Dropdown Trigger -->
+                <div class="mb-4">
+                    <label for="country-selector" class="block text-sm font-medium text-gray-700 sr-only">Country</label>
+                    <button type="button" id="country-selector" class="w-full px-4 py-3 border border-gray-300 rounded-lg flex justify-between items-center focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-transparent transition-colors duration-200">
+                        <span id="selected-country-text" class="text-gray-800">India (+91)</span>
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7" />
+                        </svg>
+                    </button>
+                </div>
+    
+                <!-- Phone Number Input -->
+                <div class="mb-6 flex items-center">
+                    <span id="country-code-span" class="text-gray-600 px-3 py-3 border-t border-b border-l border-gray-300 rounded-l-lg bg-gray-50">+91</span>
+                    <input type="tel" id="phone" name="phone" maxlength="10" placeholder="Phone Number" class="block w-full flex-grow px-4 py-3 border-t border-b border-r border-gray-300 rounded-r-lg focus:ring-teal-500 focus:border-teal-500 transition-colors duration-200">
+                </div>
+    
+                <!-- reCAPTCHA container -->
+                <div id="recaptcha-container" class="mb-4"></div>
+
+                <!-- Validation Message Box -->
+                <div id="message-box" class="hidden text-center p-3 mb-4 rounded-lg text-sm font-medium" role="alert"></div>
+                
+                <!-- Next Button -->
+                <button type="submit" id="next-button" class="w-full bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-semibold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">Next</button>
+            </form>
+        </div>
+
+        <!-- OTP Verification Section (Initially hidden) -->
+        <div id="otp-entry-section" class="hidden">
+            <div class="text-center">
+                <h1 class="text-2xl font-semibold text-gray-800 mb-2">Verify Phone Number</h1>
+                <p class="text-sm text-gray-500 mb-6">Enter the 6-digit code sent to <span id="display-phone" class="font-bold text-teal-600"></span>.</p>
+            </div>
+            <form id="otpForm">
+                <!-- OTP Input -->
+                <input type="tel" id="otp" name="otp" maxlength="6" placeholder="Enter OTP" class="w-full px-4 py-3 text-center text-xl tracking-widest border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500 transition-colors duration-200 mb-6">
+                
+                <!-- OTP Validation Message Box -->
+                <div id="otp-message-box" class="hidden text-center p-3 mb-4 rounded-lg text-sm font-medium" role="alert"></div>
+
+                <!-- Verify Button -->
+                <button type="submit" class="w-full bg-gradient-to-r from-teal-500 to-emerald-500 text-white font-semibold py-3 px-6 rounded-full shadow-lg hover:shadow-xl transition-all duration-300 transform hover:scale-105">Verify</button>
+            </form>
+        </div>
+
+        <!-- QR Code Link -->
+        <div class="text-center mt-6">
+            <a href="#" class="text-teal-600 hover:text-teal-400 text-sm transition-colors duration-200">Quick log in using QR code</a>
+        </div>
+    </div>
+
+    <!-- Country Selection Modal -->
+    <div id="country-modal" class="fixed inset-0 z-50 hidden flex items-center justify-center p-4">
+        <div class="modal-overlay absolute inset-0"></div>
+        <div class="bg-white rounded-3xl p-6 shadow-2xl w-full max-w-sm relative modal-content max-h-[80vh] flex flex-col">
+            <h2 class="text-lg font-semibold text-gray-800 mb-4">Select Country</h2>
+            <!-- Search Input -->
+            <div class="relative mb-4">
+                <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                    </svg>
+                </div>
+                <input type="text" id="country-search" placeholder="Search" class="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-teal-500 focus:border-teal-500">
+            </div>
+
+            <!-- Country List -->
+            <div id="country-list" class="overflow-y-auto flex-grow -mx-6 px-6 space-y-2">
+                <!-- Country items will be dynamically inserted here by JavaScript -->
+            </div>
+
+            <!-- Close Button -->
+            <div class="mt-4 text-right">
+                <button type="button" id="close-modal" class="text-sm font-medium text-teal-600 hover:text-teal-400 transition-colors duration-200">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Your Firebase project configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyD1F_waC58SOdIMMSp61zpHAGjjDzIuYQU",
+            authDomain: "howzitauth.firebaseapp.com",
+            projectId: "howzitauth",
+            storageBucket: "howzitauth.firebasestorage.app",
+            messagingSenderId: "651904249815",
+            appId: "1:651904249815:web:8b93729f3979c72a6f6592",
+            measurementId: "G-JHX6K60J8F"
+        };
+        
+        // The rest of the script is the same as before.
+        const countries = [
+            { name: "India", code: "91" },
+            { name: "United States", code: "1" },
+            { name: "United Kingdom", code: "44" },
+            { name: "Canada", code: "1" },
+            { name: "Australia", code: "61" },
+            // Add more countries here if needed
+        ];
+
+        const countrySelector = document.getElementById('country-selector');
+        const countryModal = document.getElementById('country-modal');
+        const closeModalButton = document.getElementById('close-modal');
+        const countrySearchInput = document.getElementById('country-search');
+        const countryListContainer = document.getElementById('country-list');
+        const selectedCountryText = document.getElementById('selected-country-text');
+        const countryCodeSpan = document.getElementById('country-code-span');
+        const loginForm = document.getElementById('loginForm');
+        const phoneInput = document.getElementById('phone');
+        const messageBox = document.getElementById('message-box');
+        const nextButton = document.getElementById('next-button');
+        
+        const otpEntrySection = document.getElementById('otp-entry-section');
+        const phoneEntrySection = document.getElementById('phone-entry-section');
+        const displayPhone = document.getElementById('display-phone');
+        const otpForm = document.getElementById('otpForm');
+        const otpInput = document.getElementById('otp');
+        const otpMessageBox = document.getElementById('otp-message-box');
+        
+        let confirmationResult;
+
+        window.onload = function() {
+            // Initialize Firebase with your provided config
+            firebase.initializeApp(firebaseConfig);
+            const auth = firebase.auth();
+            
+            // Note: The custom auth token is not needed when running locally with your own config
+            // So we can remove the logic that uses __initial_auth_token
+            
+            // Listen for authentication state changes
+            auth.onAuthStateChanged((user) => {
+                if (user) {
+                    // User is signed in. You can perform actions here.
+                    console.log("User is authenticated:", user.uid);
+                } else {
+                    // User is signed out.
+                    console.log("User is not authenticated.");
+                }
+            });
+            
+            // Set up the reCAPTCHA verifier for phone number sign-in
+            window.recaptchaVerifier = new firebase.auth.RecaptchaVerifier('recaptcha-container', {
+                'size': 'invisible',
+                'callback': (response) => {
+                    // reCAPTCHA solved, this is not needed as size is invisible
+                }
+            });
+        };
+
+        const renderCountryList = (filter = '') => {
+            countryListContainer.innerHTML = '';
+            const filteredCountries = countries.filter(country =>
+                country.name.toLowerCase().includes(filter.toLowerCase())
+            );
+
+            filteredCountries.forEach(country => {
+                const countryItem = document.createElement('div');
+                countryItem.classList.add('px-4', 'py-2', 'rounded-lg', 'cursor-pointer', 'hover:bg-gray-100', 'transition-colors', 'duration-200');
+                countryItem.innerHTML = `<span class="font-medium text-gray-800">${country.name}</span> <span class="text-gray-500 float-right">+${country.code}</span>`;
+                
+                countryItem.addEventListener('click', () => {
+                    selectedCountryText.textContent = `${country.name} (+${country.code})`;
+                    countryCodeSpan.textContent = `+${country.code}`;
+                    countryModal.classList.add('hidden');
+                    messageBox.classList.add('hidden');
+                });
+                
+                countryListContainer.appendChild(countryItem);
+            });
+        };
+
+        const showMessage = (message, isError = true) => {
+            messageBox.textContent = message;
+            messageBox.classList.remove('hidden');
+            if (isError) {
+                messageBox.classList.remove('bg-green-100', 'text-green-800');
+                messageBox.classList.add('bg-red-100', 'text-red-800');
+            } else {
+                messageBox.classList.remove('bg-red-100', 'text-red-800');
+                messageBox.classList.add('bg-green-100', 'text-green-800');
+            }
+        };
+
+        countrySelector.addEventListener('click', () => {
+            countryModal.classList.remove('hidden');
+            countrySearchInput.focus();
+            renderCountryList();
+        });
+
+        closeModalButton.addEventListener('click', () => {
+            countryModal.classList.add('hidden');
+        });
+
+        countrySearchInput.addEventListener('keyup', (e) => {
+            renderCountryList(e.target.value);
+        });
+        
+        phoneInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Backspace' || e.key === 'Delete' || e.key === 'Tab' || e.key === 'Escape' || e.key === 'Enter') {
+                return;
+            }
+            if (e.ctrlKey || e.metaKey) {
+                if (e.key === 'v') {
+                    return;
+                }
+            }
+            if (isNaN(e.key) || e.key === ' ' || e.key === null) {
+                e.preventDefault();
+            }
+        });
+        
+        phoneInput.addEventListener('paste', (e) => {
+            const paste = (e.clipboardData || window.clipboardData).getData('text');
+            const phoneRegex = /^\d*$/;
+            if (!phoneRegex.test(paste)) {
+                e.preventDefault();
+            }
+        });
+
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const fullPhoneNumber = countryCodeSpan.textContent + phoneInput.value.trim();
+            const appVerifier = window.recaptchaVerifier;
+            
+            if (phoneInput.value.trim().length !== 10) {
+                showMessage('Please enter a valid 10-digit phone number.', true);
+                return;
+            }
+
+            nextButton.disabled = true;
+            nextButton.textContent = 'Sending OTP...';
+
+            try {
+                confirmationResult = await firebase.auth().signInWithPhoneNumber(fullPhoneNumber, appVerifier);
+                showMessage(`OTP sent successfully to ${fullPhoneNumber}.`, false);
+                phoneEntrySection.classList.add('hidden');
+                otpEntrySection.classList.remove('hidden');
+                displayPhone.textContent = fullPhoneNumber;
+                otpInput.focus();
+            } catch (error) {
+                console.error("Error during phone sign-in:", error);
+                const errorMessage = `Failed to send OTP. Please check your number and try again. Error: ${error.message}`;
+                showMessage(errorMessage, true);
+            } finally {
+                nextButton.disabled = false;
+                nextButton.textContent = 'Next';
+            }
+        });
+
+        otpForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const otp = otpInput.value.trim();
+
+            if (!confirmationResult) {
+                otpMessageBox.textContent = 'Something went wrong. Please go back and try again.';
+                otpMessageBox.classList.add('bg-red-100', 'text-red-800');
+                otpMessageBox.classList.remove('hidden');
+                return;
+            }
+
+            try {
+                await confirmationResult.confirm(otp);
+                otpMessageBox.textContent = 'Verification successful! You are logged in.';
+                otpMessageBox.classList.remove('hidden', 'bg-red-100', 'text-red-800');
+                otpMessageBox.classList.add('bg-green-100', 'text-green-800');
+            } catch (error) {
+                console.error("Error during OTP verification:", error);
+                const errorMessage = `Invalid OTP. Please try again. Error: ${error.message}`;
+                otpMessageBox.textContent = errorMessage;
+                otpMessageBox.classList.remove('hidden', 'bg-green-100', 'text-green-800');
+                otpMessageBox.classList.add('bg-red-100', 'text-red-800');
+            }
+        });
+    </script>
+</body>
+</html>
